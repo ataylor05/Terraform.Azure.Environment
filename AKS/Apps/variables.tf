@@ -17,7 +17,7 @@ variable "k8s_version" {
     default = "1.17.7"
 }
 variable "cluster_name" {
-    default = "demo-build-cluster-01"
+    default = "demo-apps-cluster-01"
 }
 variable "cluster_node_count" {
     default = "1"

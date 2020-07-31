@@ -1,53 +1,73 @@
-resource "azurerm_resource_group" "network_rg" {
-  name     = "${var.prefix}-network"
-  location = var.region
+data "azurerm_subnet" "aks_sn" {
+  name                 = "AKS-01"
+  virtual_network_name = var.aks_vnet_name
+  resource_group_name  = var.network_rg_name
 }
 
-resource "azurerm_resource_group" "security_rg" {
-  name     = "${var.prefix}-security"
-  location = var.region
+resource "azurerm_log_analytics_workspace" "aks_monitors" {
+    name                = var.log_analytics_workspace
+    location            = var.region
+    resource_group_name = var.aks_rg_name
+    sku                 = "PerGB2018"
 }
 
-resource "azurerm_resource_group" "backup_rg" {
-  name     = "${var.prefix}-backup"
-  location = var.region
+resource "azurerm_kubernetes_cluster" "k8s" {
+    name                = var.cluster_name
+    location            = var.region
+    resource_group_name = var.aks_rg_name
+    dns_prefix          = "${var.cluster_name}-dns"
+    kubernetes_version  = var.k8s_version
+
+    linux_profile {
+        admin_username = var.linux_node_admin_username
+        ssh_key {
+            key_data = var.linux_node_admin_ssh_pub_key
+        }
+    }
+
+    windows_profile {
+        admin_username = var.windows_node_admin_username
+        admin_password = var.windows_node_admin_password
+    }
+
+    network_profile {
+        network_plugin     = "azure"
+        network_policy     = var.network_policy
+        docker_bridge_cidr = var.aks_docker_bridge_cidr
+        pod_cidr           = var.aks_pod_cidr
+        dns_service_ip     = var.aks_dns_service_ip
+        load_balancer_sku  = "standard"
+    }
+
+    default_node_pool {
+        name                = "linux"
+        node_count          = var.cluster_node_count
+        max_pods            = var.cluster_max_pod_count
+        vm_size             = var.cluster_node_vm_size
+        os_disk_size_gb     = var.cluster_node_vm_disk_size
+        vnet_subnet_id      = data.azurerm_subnet.aks_sn.id
+    }
+
+    service_principal {
+        client_id     = var.service_principal_id
+        client_secret = var.service_principal_secret
+    }
+
+    addon_profile {
+      oms_agent {
+        enabled                    = true
+        log_analytics_workspace_id = azurerm_log_analytics_workspace.aks_monitors.id
+      }
+    }
 }
 
-resource "azurerm_resource_group" "web_rg" {
-  name     = "${var.prefix}-web"
-  location = var.region
-}
-
-resource "azurerm_resource_group" "sql_rg" {
-  name     = "${var.prefix}-sql"
-  location = var.region
-}
-
-resource "azurerm_resource_group" "aks_rg" {
-  name     = "${var.prefix}-aks"
-  location = var.region
-}
-
-resource "azurerm_storage_account" "diag_storage_account" {
-    name                        = var.boot_diag_sa_name
-    resource_group_name         = azurerm_resource_group.security_rg.name
-    location                    = var.region
-    account_replication_type    = "LRS"
-    account_tier                = "Standard"
-}
-
-resource "azurerm_storage_account" "backups_account" {
-    name                        = var.backups_sa_name
-    resource_group_name         = azurerm_resource_group.backup_rg.name
-    location                    = var.region
-    account_replication_type    = "LRS"
-    account_tier                = "Standard"
-}
-
-resource "azurerm_container_registry" "acr" {
-  name                     = "${var.prefix}registry"
-  resource_group_name      = azurerm_resource_group.aks_rg.name
-  location                 = var.region
-  sku                      = "Standard"
-  admin_enabled            = false
+resource "azurerm_kubernetes_cluster_node_pool" "windows_pool" {
+    name                  = "win"
+    kubernetes_cluster_id = azurerm_kubernetes_cluster.k8s.id
+    vm_size               = var.cluster_node_vm_size
+    node_count            = var.cluster_node_count
+    max_pods              = var.cluster_max_pod_count
+    os_disk_size_gb       = var.cluster_node_vm_disk_size
+    os_type               = "Windows"
+    vnet_subnet_id        = data.azurerm_subnet.aks_sn.id
 }
