@@ -34,7 +34,6 @@ resource "azurerm_kubernetes_cluster" "k8s" {
         network_plugin     = "azure"
         network_policy     = var.network_policy
         docker_bridge_cidr = var.aks_docker_bridge_cidr
-        pod_cidr           = var.aks_pod_cidr
         dns_service_ip     = var.aks_dns_service_ip
         load_balancer_sku  = "standard"
     }
