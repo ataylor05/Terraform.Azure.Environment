@@ -26,7 +26,7 @@ variable "cluster_max_pod_count" {
     default = "30"
 }
 variable "cluster_node_vm_size" {
-    default = "Standard_B2Ms"
+    default = "Standard_B4Ms"
 }
 variable "cluster_node_vm_disk_size" {
     default = 100
